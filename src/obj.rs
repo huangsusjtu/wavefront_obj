@@ -635,9 +635,9 @@ impl<'a> Parser<'a> {
       (*min_normal_index, *max_normal_index),
     )?;
 
-    *min_vertex_index += vertices.len();
-    *min_tex_index += tex_vertices.len();
-    *min_normal_index += normals.len();
+    *min_vertex_index = 0;
+    *min_tex_index = 0;
+    *min_normal_index = 0;
 
     Ok(Object {
       name: name.to_owned(),
