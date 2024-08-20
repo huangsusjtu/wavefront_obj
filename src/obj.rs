@@ -406,10 +406,10 @@ impl<'a> Parser<'a> {
     Ok(Normal { x, y, z })
   }
 
-  fn parse_usemtl(&mut self) -> Result<&'a str, ParseError> {
-    self.parse_tag("usemtl")?;
-    self.parse_str()
-  }
+  // fn parse_usemtl(&mut self) -> Result<&'a str, ParseError> {
+  //   self.parse_tag("usemtl")?;
+  //   self.parse_str()
+  // }
 
   #[inline]
   fn parse_isize_from(&self, s: &str) -> Result<isize, ParseError> {
@@ -533,6 +533,7 @@ impl<'a> Parser<'a> {
 
   fn parse_geometries(
     &mut self,
+    current_material : Option<&str>,
     valid_vtx: (usize, usize),
     valid_tx: (usize, usize),
     valid_nx: (usize, usize),
@@ -540,20 +541,16 @@ impl<'a> Parser<'a> {
     let mut result = Vec::new();
     let mut shapes = Vec::new();
 
-    let mut current_material = None;
     let mut current_groups = Vec::new();
     let mut current_smoothing_groups = Vec::new();
 
+    result.push(Geometry {
+      material_name: current_material.map(|s| s.to_owned()),
+      shapes: mem::replace(&mut shapes, Vec::new()),
+    });
+
     loop {
       match self.peek() {
-        Some("usemtl") => {
-          let old_material = mem::replace(&mut current_material, Some(self.parse_usemtl()?));
-
-          result.push(Geometry {
-            material_name: old_material.map(|s| s.to_owned()),
-            shapes: mem::replace(&mut shapes, Vec::new()),
-          });
-        }
         Some("s") => {
           self.advance();
           current_smoothing_groups = self.parse_smoothing_groups()?;
@@ -606,6 +603,15 @@ impl<'a> Parser<'a> {
   ) -> Result<Object, ParseError> {
     let name = self.parse_object_name()?;
 
+    let mut usemtl : Option<&str> = None;
+    if let Some(s) = self.peek() {
+      if s.eq("usemtl") {
+        self.parse_tag("usemtl")?;
+        usemtl = Some(self.parse_str()?);
+        self.one_or_more_newlines()?;
+      }
+    }
+
     let mut vertices = Vec::new();
     let mut normals = Vec::new();
     let mut tex_vertices = Vec::new();
@@ -625,19 +631,32 @@ impl<'a> Parser<'a> {
       self.one_or_more_newlines()?;
     }
 
+
     *max_vertex_index += vertices.len();
     *max_tex_index += tex_vertices.len();
     *max_normal_index += normals.len();
 
-    let geometry = self.parse_geometries(
+    let r = self.parse_geometries(
+      usemtl,
       (*min_vertex_index, *max_vertex_index),
       (*min_tex_index, *max_tex_index),
       (*min_normal_index, *max_normal_index),
-    )?;
+    );
+    let geometry = if r.is_ok() {
+      r.unwrap()
+    } else {
+      return Err(r.err().unwrap());
+    };
+    // let geometry = self.parse_geometries(
+    //   usemtl,
+    //   (*min_vertex_index, *max_vertex_index),
+    //   (*min_tex_index, *max_tex_index),
+    //   (*min_normal_index, *max_normal_index),
+    // )?;
 
-    *min_vertex_index = 1;
-    *min_tex_index = 1;
-    *min_normal_index = 1;
+    *min_vertex_index += vertices.len();
+    *min_tex_index += tex_vertices.len();
+    *min_normal_index += normals.len();
 
     Ok(Object {
       name: name.to_owned(),
