@@ -139,7 +139,7 @@ impl PartialOrd for Material {
         .lexico(|| self.dissolve_map.cmp(&other.dissolve_map))
         .lexico(|| self.displacement_map.cmp(&other.displacement_map))
         .lexico(|| self.decal_map.cmp(&other.decal_map))
-        .lexico(|| self.bump_map.cmp(&other.bump_map))
+        .lexico(|| self.bump_map.cmp(&other.bump_map)),
     )
   }
 }
@@ -307,7 +307,11 @@ impl<'a> Parser<'a> {
 
   fn parse_map(&mut self, name: &'static str) -> Result<Option<&'a str>, ParseError> {
     match self.peek() {
-      Some(s) => if s != name { return Ok(None) },
+      Some(s) => {
+        if s != name {
+          return Ok(None);
+        }
+      }
       _ => return Ok(None),
     }
 
@@ -321,91 +325,131 @@ impl<'a> Parser<'a> {
   fn parse_material(&mut self) -> Result<Material, ParseError> {
     let name = self.parse_newmtl()?;
     self.one_or_more_newlines()?;
-    let spec_coeff = self.parse_specular_coefficeint()?;
-    self.one_or_more_newlines()?;
-    let amb = self.parse_ambient_color()?;
-    self.one_or_more_newlines()?;
-    let diff = self.parse_diffuse_color()?;
-    self.one_or_more_newlines()?;
-    let spec = self.parse_specular_color()?;
-    self.one_or_more_newlines()?;
-    let emit = self.parse_emissive_color()?;
-    if emit.is_some() {
-      self.one_or_more_newlines()?;
-    }
-    let optical_density = self.parse_optical_density()?;
-    if optical_density.is_some() {
-      self.one_or_more_newlines()?;
-    }
-    let dissolve = self.parse_dissolve()?;
-    self.one_or_more_newlines()?;
-    let illum = self.parse_illumination()?;
-    self.one_or_more_newlines()?;
 
-    // Parse maps
-    // Color textures
-    let ambient_map = self.parse_map("map_Ka")?;
-    if ambient_map.is_some() {
-      self.one_or_more_newlines()?;
-    }
-    let diffuse_map = self.parse_map("map_Kd")?;
-    if diffuse_map.is_some() {
-      self.one_or_more_newlines()?;
-    }
-    let specular_map = self.parse_map("map_Ks")?;
-    if specular_map.is_some() {
-      self.one_or_more_newlines()?;
-    }
-
-    // Scalar textures
-    let spec_exp_map = self.parse_map("map_Ns")?;
-    if spec_exp_map.is_some() {
-      self.one_or_more_newlines()?;
-    }
-    let dissolve_map = self.parse_map("map_d")?;
-    if dissolve_map.is_some() {
-      self.one_or_more_newlines()?;
-    }
-    let disp_map = self.parse_map("disp")?;
-    if disp_map.is_some() {
-      self.one_or_more_newlines()?;
-    }
-
-    // Decal (roughness) texture
-    let decal = self.parse_map("decal")?;
-    if decal.is_some() {
-      self.one_or_more_newlines()?;
-    }
-
-    // Bump texture
-    let mut bump = self.parse_map("map_bump")?;
-    if bump.is_none() {
-      // Some implementations use map_bump instead
-      bump = self.parse_map("map_bump")?;
-    }
-    if bump.is_some() {
-      self.one_or_more_newlines()?;
-    }
-
-    Ok(Material {
+    let mut material = Material {
       name: name.to_owned(),
-      specular_coefficient: spec_coeff,
-      color_ambient: amb,
-      color_diffuse: diff,
-      color_specular: spec,
-      color_emissive: emit,
-      optical_density,
-      alpha: dissolve,
-      illumination: illum,
-      ambient_map: ambient_map.map(|s| s.to_owned()),
-      diffuse_map: diffuse_map.map(|s| s.to_owned()),
-      specular_map: specular_map.map(|s| s.to_owned()),
-      specular_exponent_map: spec_exp_map.map(|s| s.to_owned()),
-      dissolve_map: dissolve_map.map(|s| s.to_owned()),
-      displacement_map: disp_map.map(|s| s.to_owned()),
-      decal_map: decal.map(|s| s.to_owned()),
-      bump_map: bump.map(|s| s.to_owned()),
-    })
+      specular_coefficient: 0.0,
+      color_ambient: Color {
+        r: 0.0,
+        g: 0.0,
+        b: 0.0,
+      },
+      color_diffuse: Color {
+        r: 0.0,
+        g: 0.0,
+        b: 0.0,
+      },
+      color_specular: Color {
+        r: 0.0,
+        g: 0.0,
+        b: 0.0,
+      },
+      color_emissive: None,
+      optical_density: None,
+      alpha: 0.0,
+      illumination: Illumination::Ambient,
+      ambient_map: None,
+      diffuse_map: None,
+      specular_map: None,
+      specular_exponent_map: None,
+      dissolve_map: None,
+      displacement_map: None,
+      decal_map: None,
+      bump_map: None,
+    };
+
+    let mut bre = false;
+    while !bre {
+      match self.peek() {
+        Some(s) => {
+          if s.eq("newmtl") {
+            // next mtl segment
+            bre = true;
+          } else {
+            if s.starts_with("#") {
+              // comment, ignore
+            } else if s.eq("Tf") {
+              self.parse_tag("Tf")?;
+              _ = self.parse_color();
+              // ...
+            } else if s.eq("Ka") {
+              let amb = self.parse_ambient_color()?;
+              material.color_ambient = amb;
+            } else if s.eq("Kd") {
+              let diff = self.parse_diffuse_color()?;
+              material.color_diffuse = diff;
+            } else if s.eq("Ks") {
+              let spec = self.parse_specular_color()?;
+              material.color_specular = spec;
+            } else if s.eq("d") {
+              let dissolve = self.parse_dissolve()?;
+              material.alpha = dissolve;
+            } else if s.eq("Ns") {
+              let spec_coeff = self.parse_specular_coefficeint()?;
+              material.specular_coefficient = spec_coeff;
+            } else if s.eq("illum") {
+              let illum = self.parse_illumination()?;
+              material.illumination = illum;
+            } else if s.eq("Ke") {
+              let emit = self.parse_emissive_color()?;
+              material.color_emissive = emit;
+            } else if s.eq("Ni") {
+              let optical_density = self.parse_optical_density()?;
+              material.optical_density = optical_density;
+            } else if s.eq("map_Ka") {
+              let ambient_map = self.parse_map("map_Ka")?;
+              material.ambient_map = ambient_map.map(|s| s.to_owned());
+            } else if s.eq("map_Kd") {
+              let diffuse_map = self.parse_map("map_Kd")?;
+              material.diffuse_map = diffuse_map.map(|s| s.to_owned());
+            } else if s.eq("map_Ks") {
+              let specular_map = self.parse_map("map_Ks")?;
+              material.specular_map = specular_map.map(|s| s.to_owned());
+            } else if s.eq("map_Ns") {
+              let spec_exp_map = self.parse_map("map_Ns")?;
+              material.specular_exponent_map = spec_exp_map.map(|s| s.to_owned());
+            } else if s.eq("map_d") {
+              let dissolve_map = self.parse_map("map_d")?;
+              material.dissolve_map = dissolve_map.map(|s| s.to_owned());
+            } else if s.eq("disp") {
+              let disp_map = self.parse_map("disp")?;
+              material.displacement_map = disp_map.map(|s| s.to_owned());
+            } else if s.eq("decal") {
+              let decal = self.parse_map("decal")?;
+              material.decal_map = decal.map(|s| s.to_owned());
+            } else if s.eq("map_bump") {
+              let bump = self.parse_map("map_bump")?;
+              material.bump_map = bump.map(|s| s.to_owned());
+            }
+            self.one_or_more_newlines()?;
+          }
+        }
+        _ => {
+          // eof
+          bre = true;
+        }
+      }
+    }
+    Ok(material)
+    // Ok(Material {
+    //   name: name.to_owned(),
+    //   specular_coefficient: spec_coeff,
+    //   color_ambient: amb,
+    //   color_diffuse: diff,
+    //   color_specular: spec,
+    //   color_emissive: emit,
+    //   optical_density,
+    //   alpha: dissolve,
+    //   illumination: illum,
+    //   ambient_map: ambient_map.map(|s| s.to_owned()),
+    //   diffuse_map: diffuse_map.map(|s| s.to_owned()),
+    //   specular_map: specular_map.map(|s| s.to_owned()),
+    //   specular_exponent_map: spec_exp_map.map(|s| s.to_owned()),
+    //   dissolve_map: dissolve_map.map(|s| s.to_owned()),
+    //   displacement_map: disp_map.map(|s| s.to_owned()),
+    //   decal_map: decal.map(|s| s.to_owned()),
+    //   bump_map: bump.map(|s| s.to_owned()),
+    // })
   }
 
   fn parse_mtlset(&mut self) -> Result<MtlSet, ParseError> {
@@ -416,7 +460,15 @@ impl<'a> Parser<'a> {
     loop {
       match self.peek() {
         Some("newmtl") => {
-          ret.push(self.parse_material()?);
+          let r = self.parse_material();
+          match r {
+            Ok(r) => {
+              ret.push(r);
+            }
+            Err(e) => {
+              println!("{}", e);
+            }
+          }
         }
         _ => break,
       }

@@ -635,9 +635,9 @@ impl<'a> Parser<'a> {
       (*min_normal_index, *max_normal_index),
     )?;
 
-    *min_vertex_index = 0;
-    *min_tex_index = 0;
-    *min_normal_index = 0;
+    *min_vertex_index = 1;
+    *min_tex_index = 1;
+    *min_normal_index = 1;
 
     Ok(Object {
       name: name.to_owned(),
@@ -660,18 +660,25 @@ impl<'a> Parser<'a> {
 
     loop {
       match self.peek() {
-        Some(_) => {
+        Some(_t) => {
           // create a checkpoint parser so that we can check if we consumed bytes
           let checkpoint = self.clone();
 
-          result.push(self.parse_object(
+          match self.parse_object(
             &mut min_vertex_index,
             &mut max_vertex_index,
             &mut min_tex_index,
             &mut max_tex_index,
             &mut min_normal_index,
             &mut max_normal_index,
-          )?);
+          ) {
+            Ok(r) => {
+              result.push(r);
+            }
+            Err(e) => {
+              println!("{}", e);
+            }
+          }
 
           if self.bytes_consumed(&checkpoint).unwrap_or(0) == 0 {
             return self.error("cannot parse corrupted data");
