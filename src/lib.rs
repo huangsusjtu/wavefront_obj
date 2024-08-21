@@ -9,5 +9,6 @@ pub use lex::ParseError;
 mod lex;
 mod util;
 
+mod context;
 pub mod mtl;
 pub mod obj;

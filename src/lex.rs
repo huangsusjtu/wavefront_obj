@@ -61,13 +61,13 @@ impl<'a> Lexer<'a> {
   ///
   /// Return [`None`] if the checkpoint parser is more advanced in the input than the current one —
   /// i.e. you have likely swapped the parsers, try calling the other way around!
-  pub(crate) fn bytes_consumed(&self, checkpoint: &Self) -> Option<usize> {
-    if self.read_pos < checkpoint.read_pos {
-      None
-    } else {
-      Some(self.read_pos - checkpoint.read_pos)
-    }
-  }
+  // pub(crate) fn bytes_consumed(&self, checkpoint: &Self) -> Option<usize> {
+  //   if self.read_pos < checkpoint.read_pos {
+  //     None
+  //   } else {
+  //     Some(self.read_pos - checkpoint.read_pos)
+  //   }
+  // }
 
   /// Advance past characters until the given condition is true.
   ///
@@ -185,13 +185,6 @@ impl<'a> PeekableLexer<'a> {
     }
   }
 
-  /// Return the number of bytes read since the last lexer state provided as argument.
-  ///
-  /// Return [`None`] if the checkpoint parser is more advanced in the input than the current one —
-  /// i.e. you have likely swapped the parsers, try calling the other way around!
-  pub(crate) fn bytes_consumed(&self, checkpoint: &Self) -> Option<usize> {
-    self.inner.bytes_consumed(&checkpoint.inner)
-  }
 }
 
 #[test]
