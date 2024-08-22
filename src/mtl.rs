@@ -195,7 +195,9 @@ impl<'a> Parser<'a> {
     match self.peek() {
       None => {} // allow eof
       Some("\n") => {}
-      Some(s) => return self.error(format!("Expected newline but got {}", s)),
+      Some(s) => {
+        return self.error(format!("line {} Expected newline but got {}", self.line_number, s))
+      },
     }
 
     self.zero_or_more_newlines();

@@ -49,10 +49,15 @@ impl Context {
     }
   }
 
+  // 结束的时候，把剩余缓冲区的数据生成object
   pub(crate) fn finish(&mut self) -> Vec<Object> {
-    if !self.geometry_s.is_empty() {
+    if !self.geometry_s.is_empty()
+      && !self.vertices.is_empty()
+      && !self.tex_vertices.is_empty()
+      && !self.normals.is_empty()
+    {
       self.objects.push(Object {
-        name: self.name.to_owned(),
+        name: std::mem::take(&mut self.name),
         vertices: std::mem::take(&mut self.vertices),
         tex_vertices: std::mem::take(&mut self.tex_vertices),
         normals: std::mem::take(&mut self.normals),
@@ -63,24 +68,27 @@ impl Context {
     return std::mem::take(&mut self.objects);
   }
 
+  // 遇到 新的 object name，把之前读到的数据生成object
   pub(crate) fn set_name(&mut self, name: String) {
-    self.is_in_face = false;
-
-    // check old
-    if !self.geometry_s.is_empty() {
+    if !self.geometry_s.is_empty()
+      && !self.vertices.is_empty()
+      && !self.tex_vertices.is_empty()
+      && !self.normals.is_empty()
+    {
       self.objects.push(Object {
-        name: self.name.to_owned(),
-        vertices: self.vertices.clone(),
-        tex_vertices: self.tex_vertices.clone(),
-        normals: self.normals.clone(),
-        geometry: self.geometry_s.clone(),
+        name: std::mem::take(&mut self.name),
+        vertices: std::mem::take(&mut self.vertices),
+        tex_vertices: std::mem::take(&mut self.tex_vertices),
+        normals: std::mem::take(&mut self.normals),
+        geometry: std::mem::take(&mut self.geometry_s),
       });
     }
-    self.geometry_s.clear();
 
+    self.is_in_face = false;
     self.name = name;
   }
 
+  // new mesh
   pub(crate) fn set_material_name(&mut self, material_name: String) {
     self.material_name = material_name;
     self.is_in_face = false;
@@ -97,36 +105,30 @@ impl Context {
   pub(crate) fn add_vertices(&mut self, v: Vertex) {
     if self.is_in_vertices == false {
       self.is_in_vertices = true;
-      self.vertices.clear();
-      self.valid_vtx.0 = self.valid_vtx.1;
     }
-    self.vertices.push(v);
-    self.valid_vtx.1 = self.valid_vtx.0 + self.vertices.len();
 
+    self.vertices.push(v);
+    self.valid_tx.1 = self.valid_tx.1 + 1;
     self.is_in_face = false;
   }
 
   pub(crate) fn add_normals(&mut self, v: Normal) {
     if self.is_in_normals == false {
       self.is_in_normals = true;
-      self.normals.clear();
-      self.valid_nx.0 = self.valid_nx.1;
     }
-    self.normals.push(v);
-    self.valid_nx.1 = self.valid_nx.0 + self.normals.len();
 
+    self.normals.push(v);
+    self.valid_nx.1 = self.valid_nx.1 + 1;
     self.is_in_face = false;
   }
 
   pub(crate) fn add_tex_vertices(&mut self, v: TVertex) {
     if self.is_in_tex_vertices == false {
       self.is_in_tex_vertices = true;
-      self.tex_vertices.clear();
-      self.valid_tx.0 = self.valid_tx.1;
     }
-    self.tex_vertices.push(v);
-    self.valid_tx.1 = self.valid_tx.0 + self.tex_vertices.len();
 
+    self.tex_vertices.push(v);
+    self.valid_vtx.1 = self.valid_vtx.1 + 1;
     self.is_in_face = false;
   }
 
@@ -138,6 +140,7 @@ impl Context {
       self.is_in_normals = false;
       self.is_in_tex_vertices = false;
 
+      // create a new mesh in current object
       self.geometry_s.push(Geometry {
         material_name: Some(std::mem::take(&mut self.material_name)),
         shapes: Vec::new(),

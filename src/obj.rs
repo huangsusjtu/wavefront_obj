@@ -387,11 +387,11 @@ impl<'a> Parser<'a> {
         let mut splits_iter = s.split('/');
         let split1 = splits_iter
           .next()
-          .and_then(|s| process_split(&s, valid_vtx).transpose())
+          .and_then(|s| process_split(&s, valid_tx).transpose())
           .transpose()?;
         let split2 = splits_iter
           .next()
-          .and_then(|s| process_split(&s, valid_tx).transpose())
+          .and_then(|s| process_split(&s, valid_vtx).transpose())
           .transpose()?;
         let split3 = splits_iter
           .next()
@@ -457,7 +457,17 @@ impl<'a> Parser<'a> {
       match self.peek() {
         None => break,
         Some("\n") => break,
-        Some(_) => corner_list.push(self.parse_vtindex(valid_vtx, valid_tx, valid_nx)?),
+        Some(_) => {
+          let r = self.parse_vtindex(valid_vtx, valid_tx, valid_nx);
+          match r {
+            Ok(r) => {
+              corner_list.push(r);
+            }
+            Err(e) => {
+              println!("{:?}", e);
+            }
+          }
+        }
       }
     }
 
