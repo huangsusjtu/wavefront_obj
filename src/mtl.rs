@@ -196,8 +196,11 @@ impl<'a> Parser<'a> {
       None => {} // allow eof
       Some("\n") => {}
       Some(s) => {
-        return self.error(format!("line {} Expected newline but got {}", self.line_number, s))
-      },
+        return self.error(format!(
+          "line {} Expected newline but got {}",
+          self.line_number, s
+        ))
+      }
     }
 
     self.zero_or_more_newlines();
